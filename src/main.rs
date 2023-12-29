@@ -11,16 +11,26 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::BlendMode;
 
-const HEIGHT_OFFSET: u16 = 64;
+const HEIGHT_PLAY_AREA_START: u16 = 64;
 const WIDTH: u16 = 768; // 32 * 24
-const HEIGHT: u16 = HEIGHT_OFFSET + 768; // 32 * 24
+const HEIGHT: u16 = HEIGHT_PLAY_AREA_START + 768; // 32 * 24
 
 const SAMPLE_RATE: u16 = 44_100;
 
+const DEBUG_MINE: &[u8; 210] = include_bytes!("../assets/debug_mine.png");
 const FLAGGED_MINE: &[u8; 211] = include_bytes!("../assets/flagged_mine.png");
 const UNFLAGGED_MINE: &[u8; 128] = include_bytes!("../assets/unflagged_mine.png");
 const REVEALED_MINE: &[u8; 128] = include_bytes!("../assets/revealed_mine.png");
 const CURSOR: &[u8; 129] = include_bytes!("../assets/cursor.png");
+
+const REVEALED_MINE_1: &[u8; 253] = include_bytes!("../assets/revealed_mine_1.png");
+const REVEALED_MINE_2: &[u8; 583] = include_bytes!("../assets/revealed_mine_2.png");
+const REVEALED_MINE_3: &[u8; 639] = include_bytes!("../assets/revealed_mine_3.png");
+const REVEALED_MINE_4: &[u8; 410] = include_bytes!("../assets/revealed_mine_4.png");
+const REVEALED_MINE_5: &[u8; 509] = include_bytes!("../assets/revealed_mine_5.png");
+const REVEALED_MINE_6: &[u8; 736] = include_bytes!("../assets/revealed_mine_6.png");
+const REVEALED_MINE_7: &[u8; 427] = include_bytes!("../assets/revealed_mine_7.png");
+const REVEALED_MINE_8: &[u8; 792] = include_bytes!("../assets/revealed_mine_8.png");
 
 #[derive(Clone, Copy)]
 struct Mine {
@@ -49,23 +59,216 @@ struct Field {
 
 impl Field {
     fn new() -> Field {
+        let mut mines = [Mine::new(); 576_usize];
+        let mut mines_to_place = 99;
+        while mines_to_place > 0 {
+            for mine in mines.iter_mut() {
+                if rand::random() && !mine.has_mine && mines_to_place > 0 {
+                    mine.has_mine = true;
+                    mines_to_place -= 1;
+                }
+            }
+        }
+
+        for mine_index in 0..mines.len() {
+            let mut mine = mines[mine_index];
+            if !mine.has_mine {
+                let x = mine_index % 24;
+                let y = mine_index / 24;
+                let mut number_of_mines = 0;
+
+                // Left Side
+                if let Some(x_value) = x.checked_sub(1) {
+                    // 0 Cell
+                    if let Some(y_value) = y.checked_sub(1) {
+                        let cell = y_value * 24 + x_value;
+                        if mines[cell].has_mine {
+                            number_of_mines += 1;
+                        }
+                    }
+                    // 3 Cell
+                    let cell = y * 24 + x_value;
+                    if mines[cell].has_mine {
+                        number_of_mines += 1;
+                    }
+                    // 6 Cell
+                    if y < 23 {
+                        let cell = (y + 1) * 24 + x_value;
+                        if mines[cell].has_mine {
+                            number_of_mines += 1;
+                        }
+                    }
+                }
+
+                // Middle
+                // 1 Cell
+                if let Some(y_value) = y.checked_sub(1) {
+                    let cell = y_value * 24 + x;
+                    if mines[cell].has_mine {
+                        number_of_mines += 1;
+                    }
+                }
+
+                // 7 Cell
+                if y < 23 {
+                    let cell = (y + 1) * 24 + x;
+                    if mines[cell].has_mine {
+                        number_of_mines += 1;
+                    }
+                }
+
+                // Right Side
+                if x < 23 {
+                    // 2 Cell
+                    if let Some(y_value) = y.checked_sub(1) {
+                        let cell = y_value * 24 + (x + 1);
+                        if mines[cell].has_mine {
+                            number_of_mines += 1;
+                        }
+                    }
+                    // 5 Cell
+                    let cell = y * 24 + (x + 1);
+                    if mines[cell].has_mine {
+                        number_of_mines += 1;
+                    }
+                    // 8 Cell
+                    if y < 23 {
+                        let cell = (y + 1) * 24 + (x + 1);
+                        if mines[cell].has_mine {
+                            number_of_mines += 1;
+                        }
+                    }
+                }
+                mine.mines_around = number_of_mines;
+            }
+            mines[mine_index] = mine;
+        }
+
         Field {
-            mines: [Mine::new(); 576_usize],
+            mines,
             flags_left: 99,
+        }
+    }
+
+    fn reveal_surrounding_mines_from_index(&mut self, index: usize) {
+        self.reveal_surrounding_mines_from_x_y(index % 24, index / 24)
+    }
+
+    fn reveal_surrounding_mines_from_x_y(&mut self, x: usize, y: usize) {
+        if let Some(x_value) = x.checked_sub(1) {
+            // 0 Cell
+            if let Some(y_value) = y.checked_sub(1) {
+                let cell = y_value * 24 + x_value;
+                if !self.mines[cell].has_mine && !self.mines[cell].revealed && self.mines[cell].mines_around == 0 {
+                    if self.mines[cell].flagged {
+                        self.mines[cell].flagged = false;
+                        self.flags_left += 1;
+                    }
+                    self.mines[cell].revealed = true;
+                    self.reveal_surrounding_mines_from_index(cell);
+                }
+            }
+            // 3 Cell
+            let cell = y * 24 + x_value;
+            if !self.mines[cell].has_mine && !self.mines[cell].revealed && self.mines[cell].mines_around == 0 {
+                if self.mines[cell].flagged {
+                    self.mines[cell].flagged = false;
+                    self.flags_left += 1;
+                }
+                self.mines[cell].revealed = true;
+                self.reveal_surrounding_mines_from_index(cell);
+            }
+            // 6 Cell
+            if y < 23 {
+                let cell = (y + 1) * 24 + x_value;
+                if !self.mines[cell].has_mine && !self.mines[cell].revealed && self.mines[cell].mines_around == 0 {
+                    if self.mines[cell].flagged {
+                        self.mines[cell].flagged = false;
+                        self.flags_left += 1;
+                    }
+                    self.mines[cell].revealed = true;
+                    self.reveal_surrounding_mines_from_index(cell);
+                }
+            }
+        }
+
+        // 1 Cell
+        if let Some(y_value) = y.checked_sub(1) {
+            let cell = y_value * 24 + x;
+            if !self.mines[cell].has_mine && !self.mines[cell].revealed && self.mines[cell].mines_around == 0 {
+                if self.mines[cell].flagged {
+                    self.mines[cell].flagged = false;
+                    self.flags_left += 1;
+                }
+                self.mines[cell].revealed = true;
+                self.reveal_surrounding_mines_from_index(cell);
+            }
+        }
+
+        // 7 Cell
+        if y < 23 {
+            let cell = (y + 1) * 24 + x;
+            if !self.mines[cell].has_mine && !self.mines[cell].revealed && self.mines[cell].mines_around == 0 {
+                if self.mines[cell].flagged {
+                    self.mines[cell].flagged = false;
+                    self.flags_left += 1;
+                }
+                self.mines[cell].revealed = true;
+                self.reveal_surrounding_mines_from_index(cell);
+            }
+        }
+
+        if x < 23 {
+            // 2 Cell
+            if let Some(y_value) = y.checked_sub(1) {
+                let cell = y_value * 24 + (x + 1);
+                if !self.mines[cell].has_mine && !self.mines[cell].revealed && self.mines[cell].mines_around == 0 {
+                    if self.mines[cell].flagged {
+                        self.mines[cell].flagged = false;
+                        self.flags_left += 1;
+                    }
+                    self.mines[cell].revealed = true;
+                    self.reveal_surrounding_mines_from_index(cell);
+                }
+            }
+            // 5 Cell
+            let cell = y * 24 + (x + 1);
+            if !self.mines[cell].has_mine && !self.mines[cell].revealed && self.mines[cell].mines_around == 0 {
+                if self.mines[cell].flagged {
+                    self.mines[cell].flagged = false;
+                    self.flags_left += 1;
+                }
+                self.mines[cell].revealed = true;
+                self.reveal_surrounding_mines_from_index(cell);
+            }
+            // 8 Cell
+            if y < 23 {
+                let cell = (y + 1) * 24 + (x + 1);
+                if !self.mines[cell].has_mine && !self.mines[cell].revealed && self.mines[cell].mines_around == 0 {
+                    if self.mines[cell].flagged {
+                        self.mines[cell].flagged = false;
+                        self.flags_left += 1;
+                    }
+                    self.mines[cell].revealed = true;
+                    self.reveal_surrounding_mines_from_index(cell);
+                }
+            }
         }
     }
 }
 
 #[derive(Clone, Copy)]
 struct Game {
+    should_die: bool,
     field: Field,
-    current_selection: u16,
+    current_selection: usize,
     inputs: [(bool, u8); 8],
 }
 
 impl Game {
     fn new() -> Game {
         Game {
+            should_die: false,
             field: Field::new(),
             current_selection: 0,
             inputs: [(false, 0); 8],
@@ -114,7 +317,7 @@ impl Game {
         */
     }
 
-    fn update_input(&mut self, is_down: bool, input: i8) {
+    fn update_input(&mut self, is_down: bool, input: usize) {
         /*
             2 == UP
             1 == LEFT
@@ -125,13 +328,12 @@ impl Game {
             6 == SELECT
             7 == START
         */
-        let input = u8::try_from(input).expect("Couldn't try_from input");
         let mut cause_event = false;
         if is_down {
-            self.inputs[input as usize] = (true, 4);
-        } else if self.inputs[input as usize].0 {
+            self.inputs[input] = (true, 4);
+        } else if self.inputs[input].0 {
             cause_event = true;
-            self.inputs[input as usize] = (false, 0);
+            self.inputs[input] = (false, 0);
         }
         if !cause_event {
             return;
@@ -168,36 +370,45 @@ impl Game {
             4 => {
                 if !is_down {
                     // Reveal Mine
-                    let mine = &mut self.field.mines[self.current_selection as usize];
-                    if !mine.revealed {
-                        if !mine.has_mine {
-                            mine.revealed = true;
-                            self.field.flags_left += 1;
-                            mine.flagged = false;
-                        } else {
-                            // Game Over
-                        }
-                    }
+                    self.reveal_from_index(self.current_selection.into());
                 }
             }
             5 => {
                 if !is_down {
                     // Flag Mine
-                    let mine = &mut self.field.mines[self.current_selection as usize];
-                    if !mine.revealed {
-                        if mine.flagged {
-                            self.field.flags_left += 1;
-                            mine.flagged = false;
-                        } else if self.field.flags_left > 0 {
-                            self.field.flags_left -= 1;
-                            mine.flagged = true;
-                        }
-                    }
+                    self.flag_from_index(self.current_selection.into());
                 }
             }
             _ => {},
         }
         println!("Current Selection: {}", self.current_selection);
+    }
+
+    fn reveal_from_index(&mut self, index: usize) {
+        let mine = &mut self.field.mines[index];
+        if !mine.revealed {
+            if !mine.has_mine {
+                mine.revealed = true;
+                self.field.flags_left += 1;
+                mine.flagged = false;
+                self.field.reveal_surrounding_mines_from_index(index);
+            } else {
+                self.should_die = true;
+            }
+        }
+    }
+
+    fn flag_from_index(&mut self, index: usize) {
+        let mine = &mut self.field.mines[index];
+        if !mine.revealed {
+            if mine.flagged {
+                self.field.flags_left += 1;
+                mine.flagged = false;
+            } else if self.field.flags_left > 0 {
+                self.field.flags_left -= 1;
+                mine.flagged = true;
+            }
+        }
     }
 }
 
@@ -219,10 +430,20 @@ fn main() {
 
     let texture_creator = canvas.texture_creator();
 
+    let debug_mine_texture = texture_creator.load_texture_bytes(DEBUG_MINE).expect("Couldn't create texture from DEBUG_MINE");
     let flagged_mine_texture = texture_creator.load_texture_bytes(FLAGGED_MINE).expect("Couldn't create texture from FLAGGED_MINE");
     let unflagged_mine_texture = texture_creator.load_texture_bytes(UNFLAGGED_MINE).expect("Couldn't create texture from UNFLAGGED_MINE");
     let revealed_mine_texture = texture_creator.load_texture_bytes(REVEALED_MINE).expect("Couldn't create texture from REVEALED_MINE");
     let cursor_texture = texture_creator.load_texture_bytes(CURSOR).expect("Couldn't create texture from CURSOR");
+
+    let revealed_mine_1_texture = texture_creator.load_texture_bytes(REVEALED_MINE_1).expect("Couldn't create texture from REVEALED_MINE_1");
+    let revealed_mine_2_texture = texture_creator.load_texture_bytes(REVEALED_MINE_2).expect("Couldn't create texture from REVEALED_MINE_2");
+    let revealed_mine_3_texture = texture_creator.load_texture_bytes(REVEALED_MINE_3).expect("Couldn't create texture from REVEALED_MINE_3");
+    let revealed_mine_4_texture = texture_creator.load_texture_bytes(REVEALED_MINE_4).expect("Couldn't create texture from REVEALED_MINE_4");
+    let revealed_mine_5_texture = texture_creator.load_texture_bytes(REVEALED_MINE_5).expect("Couldn't create texture from REVEALED_MINE_5");
+    let revealed_mine_6_texture = texture_creator.load_texture_bytes(REVEALED_MINE_6).expect("Couldn't create texture from REVEALED_MINE_6");
+    let revealed_mine_7_texture = texture_creator.load_texture_bytes(REVEALED_MINE_7).expect("Couldn't create texture from REVEALED_MINE_7");
+    let revealed_mine_8_texture = texture_creator.load_texture_bytes(REVEALED_MINE_8).expect("Couldn't create texture from REVEALED_MINE_8");
 
     let desired_spec = AudioSpecDesired {
         freq: Some(SAMPLE_RATE as i32),
@@ -272,14 +493,22 @@ fn main() {
                     // TODO: Mouse Button Down
                 },
                 Event::MouseButtonUp { mouse_btn, x, y, .. } => {
-                    match mouse_btn {
-                        MouseButton::Left => {
-                            println!("Left Button Up - x: {} - y: {}", x, y);
-                        },
-                        MouseButton::Right => {
-                            println!("Right Button Up - x: {} - y: {}", x, y);
-                        },
-                        _ => {},
+                    let y = y - HEIGHT_PLAY_AREA_START as i32;
+                    if y >= 0 {
+                        let pixel_to_2d_y = y / 32;
+                        let pixel_to_2d_x = x / 32;
+                        let mine_number = pixel_to_2d_y * 24 + pixel_to_2d_x;
+                        if let Ok(mine_number) = usize::try_from(mine_number) {
+                            match mouse_btn {
+                                MouseButton::Left => {
+                                    game.reveal_from_index(mine_number);
+                                },
+                                MouseButton::Right => {
+                                    game.flag_from_index(mine_number);
+                                },
+                                _ => {},
+                            }
+                        }
                     }
                     // TODO: Mouse Button Up
                 },
@@ -295,7 +524,7 @@ fn main() {
                         Keycode::N => 7, // START
                         _ => -1,
                     };
-                    if key_code >= 0 {
+                    if let Ok(key_code) = usize::try_from(key_code) {
                         game.update_input(true, key_code);
                     }
                 },
@@ -311,8 +540,8 @@ fn main() {
                         Keycode::N => 7, // START
                         _ => -1,
                     };
-                    if key_code >= 0 {
-                        game.update_input(false, key_code);
+                    if let Ok(key_code) = usize::try_from(key_code) {
+                        game.update_input(true, key_code);
                     }
                 },
                 Event::ControllerButtonDown { button, .. } => {
@@ -327,7 +556,7 @@ fn main() {
                         Button::Start => 7, // START
                         _ => -1,
                     };
-                    if key_code >= 0 {
+                    if let Ok(key_code) = usize::try_from(key_code) {
                         game.update_input(true, key_code);
                     }
                 },
@@ -343,38 +572,71 @@ fn main() {
                         Button::Start => 7, // START
                         _ => -1,
                     };
-                    if key_code >= 0 {
-                        game.update_input(false, key_code);
+                    if let Ok(key_code) = usize::try_from(key_code) {
+                        game.update_input(true, key_code);
                     }
                 },
                 _ => (),
             }
         }
 
+        if game.should_die {
+            break 'running;
+        }
 
         canvas.clear();
         canvas.set_blend_mode(BlendMode::Blend);
         canvas.set_draw_color(Color::RGB(128, 128, 128));
-        let _ = canvas.draw_rect(Rect::new(0, 0, WIDTH as u32, HEIGHT_OFFSET as u32));
+        let _ = canvas.draw_rect(Rect::new(0, 0, WIDTH as u32, HEIGHT_PLAY_AREA_START as u32));
         for (i, mine) in game.field.mines.iter().enumerate() {
-            let x: i32 = i as i32 % 24;
+            let x = i as i32 % 24;
             let y = i as i32 / 24;
             let texture = if mine.revealed {
-                &revealed_mine_texture
+                match mine.mines_around {
+                    1 => {
+                        &revealed_mine_1_texture
+                    },
+                    2 => {
+                        &revealed_mine_2_texture
+                    },
+                    3 => {
+                        &revealed_mine_3_texture
+                    },
+                    4 => {
+                        &revealed_mine_4_texture
+                    },
+                    5 => {
+                        &revealed_mine_5_texture
+                    },
+                    6 => {
+                        &revealed_mine_6_texture
+                    },
+                    7 => {
+                        &revealed_mine_7_texture
+                    },
+                    8 => {
+                        &revealed_mine_8_texture
+                    },
+                    _ => {
+                        &revealed_mine_texture
+                    },
+                }
             } else if mine.flagged {
                 &flagged_mine_texture
+            } else if mine.has_mine {
+                &debug_mine_texture
             } else {
                 &unflagged_mine_texture
             };
-            canvas.copy(texture, None, Some(Rect::new(32 * x, HEIGHT_OFFSET as i32 + y * 32, 32, 32))).expect("Couldn't copy canvas");
+            canvas.copy(texture, None, Some(Rect::new(32 * x, HEIGHT_PLAY_AREA_START as i32 + y * 32, 32, 32))).expect("Couldn't copy canvas");
         }
         canvas.set_blend_mode(BlendMode::None);
         if game.current_selection == 0 {
-            canvas.copy(&cursor_texture, None, Some(Rect::new(0, HEIGHT_OFFSET as i32, 32, 32))).expect("Couldn't copy canvas");
+            canvas.copy(&cursor_texture, None, Some(Rect::new(0, HEIGHT_PLAY_AREA_START as i32, 32, 32))).expect("Couldn't copy canvas");
         } else {
             let x = game.current_selection as i32 % 24;
             let y = game.current_selection as i32 / 24;
-            canvas.copy(&cursor_texture, None, Some(Rect::new(32 * x, HEIGHT_OFFSET as i32 + y * 32, 32, 32))).expect("Couldn't copy canvas");
+            canvas.copy(&cursor_texture, None, Some(Rect::new(32 * x, HEIGHT_PLAY_AREA_START as i32 + y * 32, 32, 32))).expect("Couldn't copy canvas");
         }
         canvas.present();
 
