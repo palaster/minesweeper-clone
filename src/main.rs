@@ -9,7 +9,9 @@ use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::render::BlendMode;
+use sdl2::render::{BlendMode, Canvas, Texture};
+use sdl2::ttf::Font;
+use sdl2::video::Window;
 
 const NUMBER_OF_ROWS_AND_COLUMNS: usize = 24;
 const NUMBER_OF_CELLS: usize = NUMBER_OF_ROWS_AND_COLUMNS * NUMBER_OF_ROWS_AND_COLUMNS;
@@ -379,8 +381,10 @@ impl Game {
         if !cell.revealed {
             if !cell.has_mine {
                 cell.revealed = true;
-                self.field.flags_left += 1;
-                cell.flagged = false;
+                if cell.flagged {
+                    self.field.flags_left += 1;
+                    cell.flagged = false;
+                }
                 if cell.mines_around == 0 {
                     self.field.reveal_surrounding_mines_from_index(index);
                 }
@@ -409,6 +413,7 @@ fn main() {
     let video_subsystem = sdl_context.video().expect("Couldn't init sdl video");
     let audio_subsystem = sdl_context.audio().expect("Couldn't init sdl audio");
     let game_controller_subsystem = sdl_context.game_controller().expect("Couldn't init sdl game_controller");
+    let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).expect("Couldn't init ttf");
 
     let window = video_subsystem.window("Minesweeper", WIDTH.into(), HEIGHT.into())
         .position_centered()
@@ -419,6 +424,10 @@ fn main() {
         .accelerated()
         .build()
         .expect("Couldn't create canvas from window");
+
+    //let font_path = Path::new("assets/MouldyCheeseRegular-WyMWG.ttf");
+    // TODO: include ttf in binary
+    let font = ttf_context.load_font("assets/MouldyCheeseRegular-WyMWG.ttf", 128).expect("Couldn't load font");
 
     let texture_creator = canvas.texture_creator();
 
@@ -436,6 +445,8 @@ fn main() {
     let revealed_mine_6_texture = texture_creator.load_texture_bytes(REVEALED_MINE_6).expect("Couldn't create texture from REVEALED_MINE_6");
     let revealed_mine_7_texture = texture_creator.load_texture_bytes(REVEALED_MINE_7).expect("Couldn't create texture from REVEALED_MINE_7");
     let revealed_mine_8_texture = texture_creator.load_texture_bytes(REVEALED_MINE_8).expect("Couldn't create texture from REVEALED_MINE_8");
+
+    let textures = vec![debug_mine_texture, flagged_mine_texture, unflagged_mine_texture, revealed_mine_texture, cursor_texture, revealed_mine_1_texture, revealed_mine_2_texture, revealed_mine_3_texture, revealed_mine_4_texture, revealed_mine_5_texture, revealed_mine_6_texture, revealed_mine_7_texture, revealed_mine_8_texture];
 
     let desired_spec = AudioSpecDesired {
         freq: Some(SAMPLE_RATE as i32),
@@ -471,18 +482,6 @@ fn main() {
             match event {
                 Event::Quit {..} => {
                     break 'running
-                },
-                Event:: MouseButtonDown { mouse_btn, x, y, .. } => {
-                    match mouse_btn {
-                        MouseButton::Left => {
-                            println!("Left Button Down - x: {} - y: {}", x, y);
-                        },
-                        MouseButton::Right => {
-                            println!("Right Button Down - x: {} - y: {}", x, y);
-                        },
-                        _ => {},
-                    }
-                    // TODO: Mouse Button Down
                 },
                 Event::MouseButtonUp { mouse_btn, x, y, .. } => {
                     let y = y - HEIGHT_PLAY_AREA_START as i32;
@@ -573,61 +572,16 @@ fn main() {
         }
 
         if game.should_die {
-            break 'running;
+            game.should_die = false;
+            game.field = Field::new();
+            game.current_selection = 0;
+            game.inputs = [(false, 0); 8];
         }
 
         canvas.clear();
-        canvas.set_blend_mode(BlendMode::Blend);
-        canvas.set_draw_color(Color::RGB(128, 128, 128));
-        let _ = canvas.draw_rect(Rect::new(0, 0, WIDTH as u32, HEIGHT_PLAY_AREA_START as u32));
-        for (i, cell) in game.field.cells.iter().enumerate() {
-            let (x, y) = one_d_to_two_d(i);
-            let texture = if cell.revealed {
-                match cell.mines_around {
-                    1 => {
-                        &revealed_mine_1_texture
-                    },
-                    2 => {
-                        &revealed_mine_2_texture
-                    },
-                    3 => {
-                        &revealed_mine_3_texture
-                    },
-                    4 => {
-                        &revealed_mine_4_texture
-                    },
-                    5 => {
-                        &revealed_mine_5_texture
-                    },
-                    6 => {
-                        &revealed_mine_6_texture
-                    },
-                    7 => {
-                        &revealed_mine_7_texture
-                    },
-                    8 => {
-                        &revealed_mine_8_texture
-                    },
-                    _ => {
-                        &revealed_mine_texture
-                    },
-                }
-            } else if cell.flagged {
-                &flagged_mine_texture
-            } else if cell.has_mine {
-                &debug_mine_texture
-            } else {
-                &unflagged_mine_texture
-            };
-            canvas.copy(texture, None, Some(Rect::new(32 * (x as i32), HEIGHT_PLAY_AREA_START as i32 + (y as i32) * 32, 32, 32))).expect("Couldn't copy canvas");
-        }
-        canvas.set_blend_mode(BlendMode::None);
-        if game.current_selection == 0 {
-            canvas.copy(&cursor_texture, None, Some(Rect::new(0, HEIGHT_PLAY_AREA_START as i32, 32, 32))).expect("Couldn't copy canvas");
-        } else {
-            let (x, y) = one_d_to_two_d(game.current_selection);
-            canvas.copy(&cursor_texture, None, Some(Rect::new(32 * (x as i32), HEIGHT_PLAY_AREA_START as i32 + (y as i32) * 32, 32, 32))).expect("Couldn't copy canvas");
-        }
+        
+        render_game(&game, &mut canvas, &textures, &font);
+
         canvas.present();
 
         //let _ = device.queue_audio(&spu.audio_data);
@@ -639,5 +593,47 @@ fn main() {
         if elapsed <= frame_per_second {
             thread::sleep(frame_per_second - elapsed);
         }
+    }
+}
+
+fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], font: &Font) {
+    let texture_creator = canvas.texture_creator();
+    let time_surface = font.render(&format!("Time: {}", 0)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render time font");
+    let time_texture = texture_creator.create_texture_from_surface(time_surface).expect("Could create time texture from font surface");
+    canvas.copy(&time_texture, None, Some(Rect::new(0, 0, 64, 32))).expect("Couldn't copy canvas");
+
+    let flag_surface = font.render(&format!("Flags: {}", game.field.flags_left)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render flag font");
+    let flag_texture = texture_creator.create_texture_from_surface(flag_surface).expect("Could create flag texture from font surface");
+    canvas.copy(&flag_texture, None, Some(Rect::new((WIDTH / 2).into(), 0, 64, 32))).expect("Couldn't copy canvas");
+
+    canvas.set_blend_mode(BlendMode::Blend);
+    canvas.set_draw_color(Color::RGB(128, 128, 128));
+    let _ = canvas.draw_rect(Rect::new(0, 0, WIDTH as u32, HEIGHT_PLAY_AREA_START as u32));
+    for (i, cell) in game.field.cells.iter().enumerate() {
+        let (x, y) = one_d_to_two_d(i);
+        let texture = if cell.revealed {
+            match cell.mines_around {
+                1..=8 => {
+                    &textures[4 + (cell.mines_around as usize)]
+                },
+                _ => {
+                    &textures[3]
+                },
+            }
+        } else if cell.flagged {
+            &textures[1]
+        } else {
+            &textures[2]
+        };
+        canvas.copy(texture, None, Some(Rect::new(32 * (x as i32), HEIGHT_PLAY_AREA_START as i32 + (y as i32) * 32, 32, 32))).expect("Couldn't copy canvas");
+    }
+    canvas.set_blend_mode(BlendMode::None);
+
+    // Cursor
+    if game.current_selection == 0 {
+        canvas.copy(&textures[4], None, Some(Rect::new(0, HEIGHT_PLAY_AREA_START as i32, 32, 32))).expect("Couldn't copy canvas");
+    } else {
+        let (x, y) = one_d_to_two_d(game.current_selection);
+        canvas.copy(&textures[4], None, Some(Rect::new(32 * (x as i32), HEIGHT_PLAY_AREA_START as i32 + (y as i32) * 32, 32, 32))).expect("Couldn't copy canvas");
     }
 }
