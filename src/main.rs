@@ -10,6 +10,7 @@ use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::{BlendMode, Canvas, Texture};
+use sdl2::rwops::RWops;
 use sdl2::ttf::Font;
 use sdl2::video::Window;
 
@@ -54,6 +55,8 @@ const REVEALED_MINE_5: &[u8; 509] = include_bytes!("../assets/revealed_mine_5.pn
 const REVEALED_MINE_6: &[u8; 736] = include_bytes!("../assets/revealed_mine_6.png");
 const REVEALED_MINE_7: &[u8; 427] = include_bytes!("../assets/revealed_mine_7.png");
 const REVEALED_MINE_8: &[u8; 792] = include_bytes!("../assets/revealed_mine_8.png");
+
+const MOULDY_CHEESE_REGULAR: &[u8; 112116] = include_bytes!("../assets/MouldyCheeseRegular-WyMWG.ttf");
 
 #[derive(Clone, Copy)]
 struct Cell {
@@ -425,9 +428,8 @@ fn main() {
         .build()
         .expect("Couldn't create canvas from window");
 
-    //let font_path = Path::new("assets/MouldyCheeseRegular-WyMWG.ttf");
-    // TODO: include ttf in binary
-    let font = ttf_context.load_font("assets/MouldyCheeseRegular-WyMWG.ttf", 128).expect("Couldn't load font");
+    let font_rwops = RWops::from_bytes(MOULDY_CHEESE_REGULAR).expect("Couldn't create rwops from MOULDY_CHEESE_REGUAL");
+    let font = ttf_context.load_font_from_rwops(font_rwops, 128).expect("Couldn't load font");
 
     let texture_creator = canvas.texture_creator();
 
