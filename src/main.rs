@@ -254,6 +254,8 @@ impl Field {
 
 #[derive(Clone, Copy)]
 struct Game {
+    scene: usize,
+    was_winner: bool,
     should_die: bool,
     field: Field,
     current_selection: usize,
@@ -263,6 +265,8 @@ struct Game {
 impl Game {
     fn new() -> Game {
         Game {
+            scene: 0,
+            was_winner: false,
             should_die: false,
             field: Field::new(),
             current_selection: 0,
@@ -406,9 +410,18 @@ impl Game {
             } else if self.field.flags_left > 0 {
                 self.field.flags_left -= 1;
                 cell.flagged = true;
+                if self.field.flags_left == 0 {
+                    for cell in self.field.cells {
+                        if cell.has_mine && !cell.flagged {
+                            return;
+                        }
+                    }
+                    self.should_die = true;
+                    self.was_winner = true;
+                }
+            }
             }
         }
-    }
 }
 
 fn main() {
@@ -486,6 +499,14 @@ fn main() {
                     break 'running
                 },
                 Event::MouseButtonUp { mouse_btn, x, y, .. } => {
+                    if game.scene == 1 {
+                        game.scene = 0;
+                        game.was_winner = false;
+                        game.field = Field::new();
+                        game.current_selection = 0;
+                        game.inputs = [(false, 0); 8];
+                        continue;
+                    }
                     let y = y - HEIGHT_PLAY_AREA_START as i32;
                     if y >= 0 {
                         let pixel_to_2d_y = y / 32;
@@ -522,6 +543,14 @@ fn main() {
                     }
                 },
                 Event::KeyUp { keycode: Some(key_up), repeat: false, .. } => {
+                    if game.scene == 1 {
+                        game.scene = 0;
+                        game.was_winner = false;
+                        game.field = Field::new();
+                        game.current_selection = 0;
+                        game.inputs = [(false, 0); 8];
+                        continue;
+                    }
                     let key_code: i8 = match key_up {
                         Keycode::W => 2, // UP
                         Keycode::A => 1, // LEFT
@@ -554,6 +583,14 @@ fn main() {
                     }
                 },
                 Event::ControllerButtonUp { button, .. } => {
+                    if game.scene == 1 {
+                        game.scene = 0;
+                        game.was_winner = false;
+                        game.field = Field::new();
+                        game.current_selection = 0;
+                        game.inputs = [(false, 0); 8];
+                        continue;
+                    }
                     let key_code: i8 = match button {
                         Button::DPadUp => 2, // UP
                         Button::DPadLeft => 1, // LEFT
@@ -574,15 +611,18 @@ fn main() {
         }
 
         if game.should_die {
+            game.scene = 1;
             game.should_die = false;
-            game.field = Field::new();
-            game.current_selection = 0;
-            game.inputs = [(false, 0); 8];
         }
 
         canvas.clear();
         
-        render_game(&game, &mut canvas, &textures, &font);
+        if game.scene == 0 {
+            render_game(&game, &mut canvas, &textures, &font);
+        } else if game.scene == 1 {
+            render_end(&game, &mut canvas, &font);
+        }
+        
 
         canvas.present();
 
@@ -599,18 +639,10 @@ fn main() {
 }
 
 fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], font: &Font) {
-    let texture_creator = canvas.texture_creator();
-    let time_surface = font.render(&format!("Time: {}", 0)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render time font");
-    let time_texture = texture_creator.create_texture_from_surface(time_surface).expect("Could create time texture from font surface");
-    canvas.copy(&time_texture, None, Some(Rect::new(0, 0, 64, 32))).expect("Couldn't copy canvas");
-
-    let flag_surface = font.render(&format!("Flags: {}", game.field.flags_left)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render flag font");
-    let flag_texture = texture_creator.create_texture_from_surface(flag_surface).expect("Could create flag texture from font surface");
-    canvas.copy(&flag_texture, None, Some(Rect::new((WIDTH / 2).into(), 0, 64, 32))).expect("Couldn't copy canvas");
-
     canvas.set_blend_mode(BlendMode::Blend);
     canvas.set_draw_color(Color::RGB(128, 128, 128));
-    let _ = canvas.draw_rect(Rect::new(0, 0, WIDTH as u32, HEIGHT_PLAY_AREA_START as u32));
+    let _ = canvas.fill_rect(Rect::new(0, 0, WIDTH.into(), HEIGHT_PLAY_AREA_START.into()));
+    canvas.set_draw_color(Color::RGB(0, 0, 0));
     for (i, cell) in game.field.cells.iter().enumerate() {
         let (x, y) = one_d_to_two_d(i);
         let texture = if cell.revealed {
@@ -631,6 +663,15 @@ fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], f
     }
     canvas.set_blend_mode(BlendMode::None);
 
+    let texture_creator = canvas.texture_creator();
+    let time_surface = font.render(&format!("Time: {}", 0)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render time font");
+    let time_texture = texture_creator.create_texture_from_surface(time_surface).expect("Could create time texture from font surface");
+    canvas.copy(&time_texture, None, Some(Rect::new(0, 0, 64, 32))).expect("Couldn't copy canvas");
+
+    let flag_surface = font.render(&format!("Flags: {}", game.field.flags_left)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render flag font");
+    let flag_texture = texture_creator.create_texture_from_surface(flag_surface).expect("Could create flag texture from font surface");
+    canvas.copy(&flag_texture, None, Some(Rect::new((WIDTH / 2).into(), 0, 64, 32))).expect("Couldn't copy canvas");
+
     // Cursor
     if game.current_selection == 0 {
         canvas.copy(&textures[4], None, Some(Rect::new(0, HEIGHT_PLAY_AREA_START as i32, 32, 32))).expect("Couldn't copy canvas");
@@ -638,4 +679,35 @@ fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], f
         let (x, y) = one_d_to_two_d(game.current_selection);
         canvas.copy(&textures[4], None, Some(Rect::new(32 * (x as i32), HEIGHT_PLAY_AREA_START as i32 + (y as i32) * 32, 32, 32))).expect("Couldn't copy canvas");
     }
+}
+
+fn render_end(game: &Game, canvas: &mut Canvas<Window>, font: &Font) {
+    canvas.set_blend_mode(BlendMode::Blend);
+    canvas.set_draw_color(Color::RGB(128, 128, 128));
+    let _ = canvas.fill_rect(Rect::new(0, 0, WIDTH.into(), HEIGHT.into()));
+    canvas.set_draw_color(Color::RGB(0, 0, 0));
+    canvas.set_blend_mode(BlendMode::None);
+
+    let texture_creator = canvas.texture_creator();
+    
+    let result_surface = font.render(if game.was_winner { "Winner" } else { "Loser" }).solid(Color::RGB(0, 0, 0)).expect("Couldn't render result font");
+    let result_texture = texture_creator.create_texture_from_surface(result_surface).expect("Could create result texture from font surface");
+
+    let play_again_surface = font.render("Play Again").solid(Color::RGB(0, 0, 0)).expect("Couldn't render play again font");
+    let play_again_texture = texture_creator.create_texture_from_surface(play_again_surface).expect("Could create play again texture from font surface");
+
+    let replay_surface = font.render("Press any button or left-click to continue").solid(Color::RGB(0, 0, 0)).expect("Couldn't render replay font");
+    let replay_texture = texture_creator.create_texture_from_surface(replay_surface).expect("Could create replay texture from font surface");
+
+    const RESULT_WIDTH: u16 = 256;
+    const RESULT_HEIGHT: u32 = 128;
+    canvas.copy(&result_texture, None, Some(Rect::new(((WIDTH / 2) - (RESULT_WIDTH / 2)).into(), (HEIGHT_PLAY_AREA_START / 2).into(), RESULT_WIDTH.into(), RESULT_HEIGHT))).expect("Couldn't copy canvas");
+
+    const PLAY_AGAIN_WIDTH: u16 = 128;
+    const PLAY_AGAIN_HEIGHT: u32 = 64;
+    canvas.copy(&play_again_texture, None, Some(Rect::new(((WIDTH / 2) - (PLAY_AGAIN_WIDTH / 2)).into(), (HEIGHT / 2).into(), PLAY_AGAIN_WIDTH.into(), PLAY_AGAIN_HEIGHT))).expect("Couldn't copy canvas");
+
+    const REPLAY_WIDTH: u16 = 384;
+    const REPLAY_HEIGHT: u32 = 32;
+    canvas.copy(&replay_texture, None, Some(Rect::new(((WIDTH / 2) - (REPLAY_WIDTH / 2)).into(), (HEIGHT / 2) as i32 + PLAY_AGAIN_HEIGHT as i32, REPLAY_WIDTH.into(), REPLAY_HEIGHT))).expect("Couldn't copy canvas");
 }
