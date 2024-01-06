@@ -13,3 +13,13 @@ rand = "0.8.5"
 version = "0.36.0"
 default-features = false
 features = ["image", "ttf"]
+
+[profile.release]
+panic = 'unwind'
+lto = true
+opt-level = 3
+
+[package.metadata.vita]
+title_id = "MINES0001"
+title_name = "Minesweeper"
+assets = "./assets"

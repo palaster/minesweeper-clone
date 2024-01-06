@@ -14,6 +14,23 @@ use sdl2::rwops::RWops;
 use sdl2::ttf::Font;
 use sdl2::video::Window;
 
+#[link(name = "bz2", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "png", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "freetype", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SDL2_ttf", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SDL2_image", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SceAudioIn_stub", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SceAudio_stub", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SceCommonDialog_stub", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SceCtrl_stub", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SceDisplay_stub", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SceGxm_stub", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SceHid_stub", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SceMotion_stub", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SceTouch_stub", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "zlibstatic", kind = "static", modifiers = "+whole-archive")]
+extern "C" {}
+
 const NUMBER_OF_ROWS_AND_COLUMNS: usize = 24;
 const NUMBER_OF_CELLS: usize = NUMBER_OF_ROWS_AND_COLUMNS * NUMBER_OF_ROWS_AND_COLUMNS;
 
@@ -442,7 +459,8 @@ fn main() {
     let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).expect("Couldn't init ttf");
 
     let window = video_subsystem.window("Minesweeper", WIDTH.into(), HEIGHT.into())
-        .position_centered()
+        .fullscreen_desktop()
+        .borderless()
         .build()
         .expect("Couldn't create window from video");
 
