@@ -5,8 +5,6 @@ use sdl2::audio::{AudioSpecDesired, AudioQueue};
 use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
-use sdl2::keyboard::Keycode;
-use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::{BlendMode, Canvas, Texture};
@@ -459,7 +457,7 @@ fn main() {
     let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).expect("Couldn't init ttf");
 
     let window = video_subsystem.window("Minesweeper", WIDTH.into(), HEIGHT.into())
-        .fullscreen_desktop()
+        .fullscreen()
         .borderless()
         .build()
         .expect("Couldn't create window from video");
@@ -525,78 +523,6 @@ fn main() {
             match event {
                 Event::Quit {..} => {
                     break 'running
-                },
-                Event::MouseButtonUp { mouse_btn, x, y, .. } => {
-                    if game.scene == 1 {
-                        game.scene = 0;
-                        game.game_instant = None;
-                        game.game_duration = None;
-                        game.was_winner = false;
-                        game.field = Field::new();
-                        game.current_selection = 0;
-                        game.inputs = [(false, 0); 8];
-                        continue;
-                    }
-                    let y = y - HEIGHT_PLAY_AREA_START as i32;
-                    if y >= 0 {
-                        let pixel_to_2d_y = y / 32;
-                        let pixel_to_2d_x = x / 32;
-                        let cell_number = pixel_to_2d_y * (NUMBER_OF_ROWS_AND_COLUMNS as i32) + pixel_to_2d_x;
-                        if let Ok(cell_number) = usize::try_from(cell_number) {
-                            match mouse_btn {
-                                MouseButton::Left => {
-                                    game.reveal_from_index(cell_number);
-                                },
-                                MouseButton::Right => {
-                                    game.flag_from_index(cell_number);
-                                },
-                                _ => {},
-                            }
-                        }
-                    }
-                    // TODO: Mouse Button Up
-                },
-                Event::KeyDown { keycode: Some(key_down), repeat: false, .. } => {
-                    let key_code: i8 = match key_down {
-                        Keycode::W => 2, // UP
-                        Keycode::A => 1, // LEFT
-                        Keycode::S => 3, // DOWN
-                        Keycode::D => 0, // RIGHT
-                        Keycode::H => 5, // B
-                        Keycode::U => 4, // A
-                        Keycode::B => 6, // SELECT
-                        Keycode::N => 7, // START
-                        _ => -1,
-                    };
-                    if let Ok(key_code) = usize::try_from(key_code) {
-                        game.update_input(true, key_code);
-                    }
-                },
-                Event::KeyUp { keycode: Some(key_up), repeat: false, .. } => {
-                    if game.scene == 1 {
-                        game.scene = 0;
-                        game.game_instant = None;
-                        game.game_duration = None;
-                        game.was_winner = false;
-                        game.field = Field::new();
-                        game.current_selection = 0;
-                        game.inputs = [(false, 0); 8];
-                        continue;
-                    }
-                    let key_code: i8 = match key_up {
-                        Keycode::W => 2, // UP
-                        Keycode::A => 1, // LEFT
-                        Keycode::S => 3, // DOWN
-                        Keycode::D => 0, // RIGHT
-                        Keycode::H => 5, // B
-                        Keycode::U => 4, // A
-                        Keycode::B => 6, // SELECT
-                        Keycode::N => 7, // START
-                        _ => -1,
-                    };
-                    if let Ok(key_code) = usize::try_from(key_code) {
-                        game.update_input(false, key_code);
-                    }
                 },
                 Event::ControllerButtonDown { button, .. } => {
                     let key_code: i8 = match button {
