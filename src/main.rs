@@ -296,45 +296,46 @@ impl Game {
     }
 
     fn update(&mut self) {
-        /*
         for (i, (is_down, count)) in self.inputs[0..4].iter_mut().enumerate() {
-            println!("{} - {}", i, is_down);
-            if *is_down {
-                match i {
-                    0 => {
-                        let new_selction = self.current_selection + 1;
-                        self.current_selection = if new_selction % 24 == 0 {
-                            new_selction - 24
-                        } else {
-                            new_selction
-                        }
-                    },
-                    1 => {
-                        self.current_selection = if self.current_selection % 24 == 0 {
-                            self.current_selection + 23
-                        } else {
-                            self.current_selection - 1
-                        }
-                    },
-                    2 => {
-                        self.current_selection = match self.current_selection.checked_sub(24) {
-                            Some(t) => t,
-                            None => (self.current_selection % 24) + 552,
-                        };
-                    },
-                    3 => {
-                        self.current_selection = if (self.current_selection + 24) > 576 {
-                            self.current_selection % 24
-                        } else {
-                            self.current_selection + 24
-                        }
-                    },
-                    _ => {},
+            if *count == 0 {
+                *count = 15;
+                if *is_down {
+                    match i {
+                        0 => {
+                            let new_selction = self.current_selection + 1;
+                            self.current_selection = if new_selction % 24 == 0 {
+                                new_selction - 24
+                            } else {
+                                new_selction
+                            }
+                        },
+                        1 => {
+                            self.current_selection = if self.current_selection % 24 == 0 {
+                                self.current_selection + 23
+                            } else {
+                                self.current_selection - 1
+                            }
+                        },
+                        2 => {
+                            self.current_selection = match self.current_selection.checked_sub(24) {
+                                Some(t) => t,
+                                None => (self.current_selection % 24) + 552,
+                            };
+                        },
+                        3 => {
+                            self.current_selection = if (self.current_selection + 24) > 576 {
+                                self.current_selection % 24
+                            } else {
+                                self.current_selection + 24
+                            }
+                        },
+                        _ => {},
+                    }
                 }
+            } else {
+                *count -= 1;
             }
         }
-        println!("Current Selection: {}", self.current_selection);
-        */
     }
 
     fn update_input(&mut self, is_down: bool, input: usize) {
@@ -350,7 +351,7 @@ impl Game {
         */
         let mut cause_event = false;
         if is_down {
-            self.inputs[input] = (true, 4);
+            self.inputs[input] = (true, 15);
         } else if self.inputs[input].0 {
             cause_event = true;
             self.inputs[input] = (false, 0);
@@ -401,7 +402,6 @@ impl Game {
             }
             _ => {},
         }
-        println!("Current Selection: {}", self.current_selection);
     }
 
     fn reveal_from_index(&mut self, index: usize) {
@@ -595,7 +595,7 @@ fn main() {
                         _ => -1,
                     };
                     if let Ok(key_code) = usize::try_from(key_code) {
-                        game.update_input(true, key_code);
+                        game.update_input(false, key_code);
                     }
                 },
                 Event::ControllerButtonDown { button, .. } => {
@@ -637,7 +637,7 @@ fn main() {
                         _ => -1,
                     };
                     if let Ok(key_code) = usize::try_from(key_code) {
-                        game.update_input(true, key_code);
+                        game.update_input(false, key_code);
                     }
                 },
                 _ => (),
