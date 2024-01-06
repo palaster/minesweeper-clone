@@ -257,6 +257,8 @@ struct Game {
     scene: usize,
     was_winner: bool,
     should_die: bool,
+    game_instant: Option<Instant>,
+    game_duration: Option<Duration>,
     field: Field,
     current_selection: usize,
     inputs: [(bool, u8); 8],
@@ -268,6 +270,8 @@ impl Game {
             scene: 0,
             was_winner: false,
             should_die: false,
+            game_instant: None,
+            game_duration: None,
             field: Field::new(),
             current_selection: 0,
             inputs: [(false, 0); 8],
@@ -384,6 +388,9 @@ impl Game {
     }
 
     fn reveal_from_index(&mut self, index: usize) {
+        if self.game_instant.is_none() {
+            self.game_instant = Some(Instant::now())
+        }
         let cell = &mut self.field.cells[index];
         if !cell.revealed {
             if !cell.has_mine {
@@ -402,6 +409,9 @@ impl Game {
     }
 
     fn flag_from_index(&mut self, index: usize) {
+        if self.game_instant.is_none() {
+            self.game_instant = Some(Instant::now())
+        }
         let cell = &mut self.field.cells[index];
         if !cell.revealed {
             if cell.flagged {
@@ -501,6 +511,8 @@ fn main() {
                 Event::MouseButtonUp { mouse_btn, x, y, .. } => {
                     if game.scene == 1 {
                         game.scene = 0;
+                        game.game_instant = None;
+                        game.game_duration = None;
                         game.was_winner = false;
                         game.field = Field::new();
                         game.current_selection = 0;
@@ -545,6 +557,8 @@ fn main() {
                 Event::KeyUp { keycode: Some(key_up), repeat: false, .. } => {
                     if game.scene == 1 {
                         game.scene = 0;
+                        game.game_instant = None;
+                        game.game_duration = None;
                         game.was_winner = false;
                         game.field = Field::new();
                         game.current_selection = 0;
@@ -585,6 +599,8 @@ fn main() {
                 Event::ControllerButtonUp { button, .. } => {
                     if game.scene == 1 {
                         game.scene = 0;
+                        game.game_instant = None;
+                        game.game_duration = None;
                         game.was_winner = false;
                         game.field = Field::new();
                         game.current_selection = 0;
@@ -613,6 +629,9 @@ fn main() {
         if game.should_die {
             game.scene = 1;
             game.should_die = false;
+            if let Some(game_instant) = game.game_instant {
+                game.game_duration = Some(game_instant.elapsed());
+            }
         }
 
         canvas.clear();
@@ -664,13 +683,27 @@ fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], f
     canvas.set_blend_mode(BlendMode::None);
 
     let texture_creator = canvas.texture_creator();
-    let time_surface = font.render(&format!("Time: {}", 0)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render time font");
+
+    let time_surface = font.render(&format!("Time: {}", if let Some(game_instant) = game.game_instant { game_instant.elapsed().as_secs() } else { 0 })).solid(Color::RGB(0, 0, 0)).expect("Couldn't render time font");
     let time_texture = texture_creator.create_texture_from_surface(time_surface).expect("Could create time texture from font surface");
-    canvas.copy(&time_texture, None, Some(Rect::new(0, 0, 64, 32))).expect("Couldn't copy canvas");
+
+    const TIME_WIDTH: u32 = 64;
+    const TIME_HEIGHT: u32 = 32;
+    canvas.copy(&time_texture, None, Some(Rect::new(0, 0, TIME_WIDTH, TIME_HEIGHT))).expect("Couldn't copy canvas");
 
     let flag_surface = font.render(&format!("Flags: {}", game.field.flags_left)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render flag font");
     let flag_texture = texture_creator.create_texture_from_surface(flag_surface).expect("Could create flag texture from font surface");
-    canvas.copy(&flag_texture, None, Some(Rect::new((WIDTH / 2).into(), 0, 64, 32))).expect("Couldn't copy canvas");
+
+    const FLAG_WIDTH: u32 = 64;
+    const FLAG_HEIGHT: u32 = 32;
+    canvas.copy(&flag_texture, None, Some(Rect::new((WIDTH / 2).into(), 0, FLAG_WIDTH, FLAG_HEIGHT))).expect("Couldn't copy canvas");
+
+    let watermark_surface = font.render("Palaster").solid(Color::RGB(255, 0, 0)).expect("Couldn't render watermark font");
+    let watermark_texture = texture_creator.create_texture_from_surface(watermark_surface).expect("Could create watermark texture from font surface");
+
+    const WATERMARK_WIDTH: u32 = 64;
+    const WATERMARK_HEIGHT: u32 = 32;
+    canvas.copy(&watermark_texture, None, Some(Rect::new(0, (HEIGHT_PLAY_AREA_START as u32 - WATERMARK_HEIGHT) as i32, WATERMARK_WIDTH, WATERMARK_HEIGHT))).expect("Couldn't copy canvas");
 
     // Cursor
     if game.current_selection == 0 {
@@ -693,21 +726,51 @@ fn render_end(game: &Game, canvas: &mut Canvas<Window>, font: &Font) {
     let result_surface = font.render(if game.was_winner { "Winner" } else { "Loser" }).solid(Color::RGB(0, 0, 0)).expect("Couldn't render result font");
     let result_texture = texture_creator.create_texture_from_surface(result_surface).expect("Could create result texture from font surface");
 
-    let play_again_surface = font.render("Play Again").solid(Color::RGB(0, 0, 0)).expect("Couldn't render play again font");
-    let play_again_texture = texture_creator.create_texture_from_surface(play_again_surface).expect("Could create play again texture from font surface");
-
-    let replay_surface = font.render("Press any button or left-click to continue").solid(Color::RGB(0, 0, 0)).expect("Couldn't render replay font");
-    let replay_texture = texture_creator.create_texture_from_surface(replay_surface).expect("Could create replay texture from font surface");
-
     const RESULT_WIDTH: u16 = 256;
     const RESULT_HEIGHT: u32 = 128;
     canvas.copy(&result_texture, None, Some(Rect::new(((WIDTH / 2) - (RESULT_WIDTH / 2)).into(), (HEIGHT_PLAY_AREA_START / 2).into(), RESULT_WIDTH.into(), RESULT_HEIGHT))).expect("Couldn't copy canvas");
+
+    let play_again_surface = font.render("Play Again").solid(Color::RGB(0, 0, 0)).expect("Couldn't render play again font");
+    let play_again_texture = texture_creator.create_texture_from_surface(play_again_surface).expect("Could create play again texture from font surface");
 
     const PLAY_AGAIN_WIDTH: u16 = 128;
     const PLAY_AGAIN_HEIGHT: u32 = 64;
     canvas.copy(&play_again_texture, None, Some(Rect::new(((WIDTH / 2) - (PLAY_AGAIN_WIDTH / 2)).into(), (HEIGHT / 2).into(), PLAY_AGAIN_WIDTH.into(), PLAY_AGAIN_HEIGHT))).expect("Couldn't copy canvas");
 
+    let replay_surface = font.render("Press any button or left-click to continue").solid(Color::RGB(0, 0, 0)).expect("Couldn't render replay font");
+    let replay_texture = texture_creator.create_texture_from_surface(replay_surface).expect("Could create replay texture from font surface");
+
     const REPLAY_WIDTH: u16 = 384;
     const REPLAY_HEIGHT: u32 = 32;
     canvas.copy(&replay_texture, None, Some(Rect::new(((WIDTH / 2) - (REPLAY_WIDTH / 2)).into(), (HEIGHT / 2) as i32 + PLAY_AGAIN_HEIGHT as i32, REPLAY_WIDTH.into(), REPLAY_HEIGHT))).expect("Couldn't copy canvas");
+
+    let watermark_surface = font.render("Palaster").solid(Color::RGB(255, 0, 0)).expect("Couldn't render watermark font");
+    let watermark_texture = texture_creator.create_texture_from_surface(watermark_surface).expect("Could create watermark texture from font surface");
+
+    const WATERMARK_WIDTH: u32 = 64;
+    const WATERMARK_HEIGHT: u32 = 32;
+    canvas.copy(&watermark_texture, None, Some(Rect::new(0, (HEIGHT as u32 - WATERMARK_HEIGHT) as i32, WATERMARK_WIDTH, WATERMARK_HEIGHT))).expect("Couldn't copy canvas");
+
+    let duration_surface = font.render(&format!("Time: {}", if let Some(game_duration) = game.game_duration { game_duration.as_secs() } else { 0 })).solid(Color::RGB(0, 0, 0)).expect("Couldn't render duration font");
+    let duration_texture = texture_creator.create_texture_from_surface(duration_surface).expect("Could create duration texture from font surface");
+
+    const DURATION_WIDTH: u16 = 128;
+    const DURATION_HEIGHT: u32 = 64;
+    canvas.copy(&duration_texture, None, Some(Rect::new(((WIDTH / 2) - (DURATION_WIDTH / 2)).into(), (HEIGHT / 4).into(), DURATION_WIDTH.into(), DURATION_HEIGHT))).expect("Couldn't copy canvas");
+
+    if !game.was_winner {
+        let mut flagged_mine_counter = 0;
+        for cell in game.field.cells {
+            if cell.flagged && cell.has_mine {
+                flagged_mine_counter += 1;
+            }
+        }
+
+        let correct_surface = font.render(&format!("Correctly flagged mines: {}", flagged_mine_counter)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render correct font");
+        let correct_texture = texture_creator.create_texture_from_surface(correct_surface).expect("Could create correct texture from font surface");
+
+        const CORRECT_WIDTH: u16 = 256;
+        const CORRECT_HEIGHT: u32 = 64;
+        canvas.copy(&correct_texture, None, Some(Rect::new(((WIDTH / 2) - (CORRECT_WIDTH / 2)).into(), (HEIGHT / 4) as i32 + DURATION_HEIGHT as i32, CORRECT_WIDTH.into(), CORRECT_HEIGHT))).expect("Couldn't copy canvas");
+    }
 }
