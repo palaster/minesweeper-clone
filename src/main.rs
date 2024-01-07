@@ -301,30 +301,30 @@ impl Game {
                     match i {
                         0 => {
                             let new_selction = self.current_selection + 1;
-                            self.current_selection = if new_selction % 24 == 0 {
-                                new_selction - 24
+                            self.current_selection = if new_selction % NUMBER_OF_ROWS_AND_COLUMNS == 0 {
+                                new_selction - NUMBER_OF_ROWS_AND_COLUMNS
                             } else {
                                 new_selction
                             }
                         },
                         1 => {
-                            self.current_selection = if self.current_selection % 24 == 0 {
-                                self.current_selection + 23
+                            self.current_selection = if self.current_selection % NUMBER_OF_ROWS_AND_COLUMNS == 0 {
+                                self.current_selection + NUMBER_OF_ROWS_AND_COLUMNS - 1
                             } else {
                                 self.current_selection - 1
                             }
                         },
                         2 => {
-                            self.current_selection = match self.current_selection.checked_sub(24) {
+                            self.current_selection = match self.current_selection.checked_sub(NUMBER_OF_ROWS_AND_COLUMNS) {
                                 Some(t) => t,
-                                None => (self.current_selection % 24) + 552,
+                                None => (self.current_selection % NUMBER_OF_ROWS_AND_COLUMNS) + (NUMBER_OF_CELLS - NUMBER_OF_ROWS_AND_COLUMNS),
                             };
                         },
                         3 => {
-                            self.current_selection = if (self.current_selection + 24) > 576 {
-                                self.current_selection % 24
+                            self.current_selection = if (self.current_selection + NUMBER_OF_ROWS_AND_COLUMNS) >= NUMBER_OF_CELLS {
+                                self.current_selection % NUMBER_OF_ROWS_AND_COLUMNS
                             } else {
-                                self.current_selection + 24
+                                self.current_selection + NUMBER_OF_ROWS_AND_COLUMNS
                             }
                         },
                         _ => {},
@@ -380,7 +380,7 @@ impl Game {
                 };
             },
             3 => {
-                self.current_selection = if (self.current_selection + NUMBER_OF_ROWS_AND_COLUMNS) > NUMBER_OF_CELLS {
+                self.current_selection = if (self.current_selection + NUMBER_OF_ROWS_AND_COLUMNS) >= NUMBER_OF_CELLS {
                     self.current_selection % NUMBER_OF_ROWS_AND_COLUMNS
                 } else {
                     self.current_selection + NUMBER_OF_ROWS_AND_COLUMNS
@@ -585,7 +585,6 @@ fn main() {
         } else if game.scene == 1 {
             render_end(&game, &mut canvas, &font);
         }
-        
 
         canvas.present();
 
@@ -602,12 +601,22 @@ fn main() {
 }
 
 fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], font: &Font) {
+    let window_size = canvas.window().size();
+    let window_width = window_size.0;
+    let window_height = window_size.1;
+
+    let width_scale_factor = if window_width < WIDTH.into() { window_width as f64 / WIDTH as f64 } else { 1.0 };
+    let height_scale_factor = if window_height < HEIGHT.into() { window_height as f64 / HEIGHT as f64 } else { 1.0 };
+
+    let width = (WIDTH as f64) * width_scale_factor;
+    let height_play_area_start = (HEIGHT_PLAY_AREA_START as f64) * height_scale_factor;
+
     canvas.set_blend_mode(BlendMode::Blend);
     canvas.set_draw_color(Color::RGB(128, 128, 128));
-    let _ = canvas.fill_rect(Rect::new(0, 0, WIDTH.into(), HEIGHT_PLAY_AREA_START.into()));
+    let _ = canvas.fill_rect(Rect::new(0, 0, width as u32, height_play_area_start as u32));
     canvas.set_draw_color(Color::RGB(0, 0, 0));
     for (i, cell) in game.field.cells.iter().enumerate() {
-        let (x, y) = one_d_to_two_d(i);
+        let (row, column) = one_d_to_two_d(i);
         let texture = if cell.revealed {
             match cell.mines_around {
                 1..=8 => {
@@ -622,7 +631,9 @@ fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], f
         } else {
             &textures[2]
         };
-        canvas.copy(texture, None, Some(Rect::new(32 * (x as i32), HEIGHT_PLAY_AREA_START as i32 + (y as i32) * 32, 32, 32))).expect("Couldn't copy canvas");
+        let x = (32.0 * width_scale_factor) * row as f64;
+        let y = height_play_area_start + (column as f64) * (32.0 * height_scale_factor);
+        canvas.copy(texture, None, Some(Rect::new(x as i32, y as i32, (32.0 * width_scale_factor) as u32, (32.0 * height_scale_factor) as u32))).expect("Couldn't copy canvas");
     }
     canvas.set_blend_mode(BlendMode::None);
 
@@ -650,15 +661,23 @@ fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], f
     canvas.copy(&watermark_texture, None, Some(Rect::new(0, (HEIGHT_PLAY_AREA_START as u32 - WATERMARK_HEIGHT) as i32, WATERMARK_WIDTH, WATERMARK_HEIGHT))).expect("Couldn't copy canvas");
 
     // Cursor
-    if game.current_selection == 0 {
-        canvas.copy(&textures[4], None, Some(Rect::new(0, HEIGHT_PLAY_AREA_START as i32, 32, 32))).expect("Couldn't copy canvas");
-    } else {
-        let (x, y) = one_d_to_two_d(game.current_selection);
-        canvas.copy(&textures[4], None, Some(Rect::new(32 * (x as i32), HEIGHT_PLAY_AREA_START as i32 + (y as i32) * 32, 32, 32))).expect("Couldn't copy canvas");
-    }
+    let (row, column) = one_d_to_two_d(game.current_selection);
+    let x = (32.0 * width_scale_factor) * row as f64;
+    let y = height_play_area_start + (column as f64) * (32.0 * height_scale_factor);
+    canvas.copy(&textures[4], None, Some(Rect::new(x as i32, y as i32, (32.0 * width_scale_factor) as u32, (32.0 * height_scale_factor) as u32))).expect("Couldn't copy canvas");
 }
 
 fn render_end(game: &Game, canvas: &mut Canvas<Window>, font: &Font) {
+    let window_size = canvas.window().size();
+    let window_width = window_size.0;
+    let window_height = window_size.1;
+
+    let scale_width = window_width < WIDTH.into();
+    let scale_height = window_height < HEIGHT.into();
+
+    let width_scale_factor = if scale_width { window_width as f64 / WIDTH as f64 } else { 1.0 };
+    let height_scale_factor = if scale_height { window_height as f64 / HEIGHT as f64 } else { 1.0 };
+
     canvas.set_blend_mode(BlendMode::Blend);
     canvas.set_draw_color(Color::RGB(128, 128, 128));
     let _ = canvas.fill_rect(Rect::new(0, 0, WIDTH.into(), HEIGHT.into()));
