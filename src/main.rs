@@ -605,8 +605,8 @@ fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], f
     let window_width = window_size.0;
     let window_height = window_size.1;
 
-    let width_scale_factor = if window_width < WIDTH.into() { window_width as f64 / WIDTH as f64 } else { 1.0 };
-    let height_scale_factor = if window_height < HEIGHT.into() { window_height as f64 / HEIGHT as f64 } else { 1.0 };
+    let width_scale_factor = window_width as f64 / WIDTH as f64;
+    let height_scale_factor = window_height as f64 / HEIGHT as f64;
 
     let width = (WIDTH as f64) * width_scale_factor;
     let height_play_area_start = (HEIGHT_PLAY_AREA_START as f64) * height_scale_factor;
@@ -642,23 +642,23 @@ fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], f
     let time_surface = font.render(&format!("Time: {}", if let Some(game_instant) = game.game_instant { game_instant.elapsed().as_secs() } else { 0 })).solid(Color::RGB(0, 0, 0)).expect("Couldn't render time font");
     let time_texture = texture_creator.create_texture_from_surface(time_surface).expect("Could create time texture from font surface");
 
-    const TIME_WIDTH: u32 = 64;
-    const TIME_HEIGHT: u32 = 32;
-    canvas.copy(&time_texture, None, Some(Rect::new(0, 0, TIME_WIDTH, TIME_HEIGHT))).expect("Couldn't copy canvas");
+    let time_width = 64.0 * width_scale_factor;
+    let time_height = 32.0 * height_scale_factor;
+    canvas.copy(&time_texture, None, Some(Rect::new(0, 0, time_width as u32, time_height as u32))).expect("Couldn't copy canvas");
 
     let flag_surface = font.render(&format!("Flags: {}", game.field.flags_left)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render flag font");
     let flag_texture = texture_creator.create_texture_from_surface(flag_surface).expect("Could create flag texture from font surface");
 
-    const FLAG_WIDTH: u32 = 64;
-    const FLAG_HEIGHT: u32 = 32;
-    canvas.copy(&flag_texture, None, Some(Rect::new((WIDTH / 2).into(), 0, FLAG_WIDTH, FLAG_HEIGHT))).expect("Couldn't copy canvas");
+    let flag_width = 64.0 * width_scale_factor;
+    let flag_height = 32.0 * height_scale_factor;
+    canvas.copy(&flag_texture, None, Some(Rect::new((width / 2.0) as i32, 0, flag_width as u32, flag_height as u32))).expect("Couldn't copy canvas");
 
     let watermark_surface = font.render("Palaster").solid(Color::RGB(255, 0, 0)).expect("Couldn't render watermark font");
     let watermark_texture = texture_creator.create_texture_from_surface(watermark_surface).expect("Could create watermark texture from font surface");
 
-    const WATERMARK_WIDTH: u32 = 64;
-    const WATERMARK_HEIGHT: u32 = 32;
-    canvas.copy(&watermark_texture, None, Some(Rect::new(0, (HEIGHT_PLAY_AREA_START as u32 - WATERMARK_HEIGHT) as i32, WATERMARK_WIDTH, WATERMARK_HEIGHT))).expect("Couldn't copy canvas");
+    let watermark_width = 64.0 * width_scale_factor;
+    let watermark_height = 32.0 * height_scale_factor;
+    canvas.copy(&watermark_texture, None, Some(Rect::new(0, (height_play_area_start - watermark_height) as i32, watermark_width as u32, watermark_height as u32))).expect("Couldn't copy canvas");
 
     // Cursor
     let (row, column) = one_d_to_two_d(game.current_selection);
@@ -672,15 +672,16 @@ fn render_end(game: &Game, canvas: &mut Canvas<Window>, font: &Font) {
     let window_width = window_size.0;
     let window_height = window_size.1;
 
-    let scale_width = window_width < WIDTH.into();
-    let scale_height = window_height < HEIGHT.into();
+    let width_scale_factor = window_width as f64 / WIDTH as f64;
+    let height_scale_factor = window_height as f64 / HEIGHT as f64;
 
-    let width_scale_factor = if scale_width { window_width as f64 / WIDTH as f64 } else { 1.0 };
-    let height_scale_factor = if scale_height { window_height as f64 / HEIGHT as f64 } else { 1.0 };
+    let width = (WIDTH as f64) * width_scale_factor;
+    let height_play_area_start = (HEIGHT_PLAY_AREA_START as f64) * height_scale_factor;
+    let height = (HEIGHT as f64) * height_scale_factor;
 
     canvas.set_blend_mode(BlendMode::Blend);
     canvas.set_draw_color(Color::RGB(128, 128, 128));
-    let _ = canvas.fill_rect(Rect::new(0, 0, WIDTH.into(), HEIGHT.into()));
+    let _ = canvas.fill_rect(Rect::new(0, 0, width as u32, height as u32));
     canvas.set_draw_color(Color::RGB(0, 0, 0));
     canvas.set_blend_mode(BlendMode::None);
 
@@ -689,37 +690,37 @@ fn render_end(game: &Game, canvas: &mut Canvas<Window>, font: &Font) {
     let result_surface = font.render(if game.was_winner { "Winner" } else { "Loser" }).solid(Color::RGB(0, 0, 0)).expect("Couldn't render result font");
     let result_texture = texture_creator.create_texture_from_surface(result_surface).expect("Could create result texture from font surface");
 
-    const RESULT_WIDTH: u16 = 256;
-    const RESULT_HEIGHT: u32 = 128;
-    canvas.copy(&result_texture, None, Some(Rect::new(((WIDTH / 2) - (RESULT_WIDTH / 2)).into(), (HEIGHT_PLAY_AREA_START / 2).into(), RESULT_WIDTH.into(), RESULT_HEIGHT))).expect("Couldn't copy canvas");
+    let result_width = 256.0 * width_scale_factor;
+    let result_height = 128.0 * height_scale_factor;
+    canvas.copy(&result_texture, None, Some(Rect::new(((width / 2.0) - (result_width / 2.0)) as i32, (height_play_area_start / 2.0) as i32, result_width as u32, result_height as u32))).expect("Couldn't copy canvas");
 
     let play_again_surface = font.render("Play Again").solid(Color::RGB(0, 0, 0)).expect("Couldn't render play again font");
     let play_again_texture = texture_creator.create_texture_from_surface(play_again_surface).expect("Could create play again texture from font surface");
 
-    const PLAY_AGAIN_WIDTH: u16 = 128;
-    const PLAY_AGAIN_HEIGHT: u32 = 64;
-    canvas.copy(&play_again_texture, None, Some(Rect::new(((WIDTH / 2) - (PLAY_AGAIN_WIDTH / 2)).into(), (HEIGHT / 2).into(), PLAY_AGAIN_WIDTH.into(), PLAY_AGAIN_HEIGHT))).expect("Couldn't copy canvas");
+    let play_again_width = 128.0 * width_scale_factor;
+    let play_again_height = 64.0 * height_scale_factor;
+    canvas.copy(&play_again_texture, None, Some(Rect::new(((width / 2.0) - (play_again_width / 2.0)) as i32, (height / 2.0) as i32, play_again_width as u32, play_again_height as u32))).expect("Couldn't copy canvas");
 
     let replay_surface = font.render("Press any button or left-click to continue").solid(Color::RGB(0, 0, 0)).expect("Couldn't render replay font");
     let replay_texture = texture_creator.create_texture_from_surface(replay_surface).expect("Could create replay texture from font surface");
 
-    const REPLAY_WIDTH: u16 = 384;
-    const REPLAY_HEIGHT: u32 = 32;
-    canvas.copy(&replay_texture, None, Some(Rect::new(((WIDTH / 2) - (REPLAY_WIDTH / 2)).into(), (HEIGHT / 2) as i32 + PLAY_AGAIN_HEIGHT as i32, REPLAY_WIDTH.into(), REPLAY_HEIGHT))).expect("Couldn't copy canvas");
+    let replay_width = 384.0 * width_scale_factor;
+    let replay_height = 32.0 * height_scale_factor;
+    canvas.copy(&replay_texture, None, Some(Rect::new(((width / 2.0) - (replay_width / 2.0)) as i32, ((height / 2.0) + play_again_height) as i32, replay_width as u32, replay_height as u32))).expect("Couldn't copy canvas");
 
     let watermark_surface = font.render("Palaster").solid(Color::RGB(255, 0, 0)).expect("Couldn't render watermark font");
     let watermark_texture = texture_creator.create_texture_from_surface(watermark_surface).expect("Could create watermark texture from font surface");
 
-    const WATERMARK_WIDTH: u32 = 64;
-    const WATERMARK_HEIGHT: u32 = 32;
-    canvas.copy(&watermark_texture, None, Some(Rect::new(0, (HEIGHT as u32 - WATERMARK_HEIGHT) as i32, WATERMARK_WIDTH, WATERMARK_HEIGHT))).expect("Couldn't copy canvas");
+    let watermark_width = 64.0 * width_scale_factor;
+    let watermark_height = 32.0 * height_scale_factor;
+    canvas.copy(&watermark_texture, None, Some(Rect::new(0, (height - watermark_height) as i32, watermark_width as u32, watermark_height as u32))).expect("Couldn't copy canvas");
 
     let duration_surface = font.render(&format!("Time: {}", if let Some(game_duration) = game.game_duration { game_duration.as_secs() } else { 0 })).solid(Color::RGB(0, 0, 0)).expect("Couldn't render duration font");
     let duration_texture = texture_creator.create_texture_from_surface(duration_surface).expect("Could create duration texture from font surface");
 
-    const DURATION_WIDTH: u16 = 128;
-    const DURATION_HEIGHT: u32 = 64;
-    canvas.copy(&duration_texture, None, Some(Rect::new(((WIDTH / 2) - (DURATION_WIDTH / 2)).into(), (HEIGHT / 4).into(), DURATION_WIDTH.into(), DURATION_HEIGHT))).expect("Couldn't copy canvas");
+    let duration_width = 128.0 * width_scale_factor;
+    let duration_height = 64.0 * height_scale_factor;
+    canvas.copy(&duration_texture, None, Some(Rect::new(((width / 2.0) - (duration_width / 2.0)) as i32, (height / 4.0) as i32, duration_width as u32, duration_height as u32))).expect("Couldn't copy canvas");
 
     if !game.was_winner {
         let mut flagged_mine_counter = 0;
@@ -732,8 +733,8 @@ fn render_end(game: &Game, canvas: &mut Canvas<Window>, font: &Font) {
         let correct_surface = font.render(&format!("Correctly flagged mines: {}", flagged_mine_counter)).solid(Color::RGB(0, 0, 0)).expect("Couldn't render correct font");
         let correct_texture = texture_creator.create_texture_from_surface(correct_surface).expect("Could create correct texture from font surface");
 
-        const CORRECT_WIDTH: u16 = 256;
-        const CORRECT_HEIGHT: u32 = 64;
-        canvas.copy(&correct_texture, None, Some(Rect::new(((WIDTH / 2) - (CORRECT_WIDTH / 2)).into(), (HEIGHT / 4) as i32 + DURATION_HEIGHT as i32, CORRECT_WIDTH.into(), CORRECT_HEIGHT))).expect("Couldn't copy canvas");
+        let correct_width = 256.0 * width_scale_factor;
+        let correct_height = 64.0 * height_scale_factor;
+        canvas.copy(&correct_texture, None, Some(Rect::new(((width / 2.0) - (correct_width / 2.0)) as i32, ((height / 4.0) + duration_height) as i32, correct_width as u32, correct_height as u32))).expect("Couldn't copy canvas");
     }
 }
