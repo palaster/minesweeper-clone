@@ -1,10 +1,10 @@
 use std::thread;
 use std::time::{Instant, Duration};
 
-use sdl2::audio::{AudioSpecDesired, AudioQueue};
 use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
+use sdl2::mixer::{DEFAULT_CHANNELS, DEFAULT_FREQUENCY, DEFAULT_FORMAT, InitFlag};
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::{BlendMode, Canvas, Texture};
@@ -12,10 +12,23 @@ use sdl2::rwops::RWops;
 use sdl2::ttf::Font;
 use sdl2::video::Window;
 
+#[link(name = "vorbis", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "vorbisfile", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "mikmod", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "modplug", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "mpg123", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "FLAC", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "FLAC++", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "ogg", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "xmp", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "opus", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "opusfile", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "bz2", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "zlibstatic", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "png", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "freetype", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "SDL2_ttf", kind = "static", modifiers = "+whole-archive")]
+#[link(name = "SDL2_mixer", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "SDL2_image", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "SceAudioIn_stub", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "SceAudio_stub", kind = "static", modifiers = "+whole-archive")]
@@ -26,7 +39,6 @@ use sdl2::video::Window;
 #[link(name = "SceHid_stub", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "SceMotion_stub", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "SceTouch_stub", kind = "static", modifiers = "+whole-archive")]
-#[link(name = "zlibstatic", kind = "static", modifiers = "+whole-archive")]
 extern "C" {}
 
 const NUMBER_OF_ROWS_AND_COLUMNS: usize = 24;
@@ -72,6 +84,8 @@ const REVEALED_MINE_7: &[u8; 427] = include_bytes!("../assets/revealed_mine_7.pn
 const REVEALED_MINE_8: &[u8; 792] = include_bytes!("../assets/revealed_mine_8.png");
 
 const MOULDY_CHEESE_REGULAR: &[u8; 112116] = include_bytes!("../assets/MouldyCheeseRegular-WyMWG.ttf");
+
+const AWAKE10_MEGA_WALL: &[u8; 2026231] = include_bytes!("../assets/awake10_megaWall.mp3");
 
 #[derive(Clone, Copy)]
 struct Cell {
@@ -452,7 +466,7 @@ impl Game {
 fn main() {
     let sdl_context = sdl2::init().expect("Couldn't init sdl");
     let video_subsystem = sdl_context.video().expect("Couldn't init sdl video");
-    let audio_subsystem = sdl_context.audio().expect("Couldn't init sdl audio");
+    let _audio_subsystem = sdl_context.audio().expect("Couldn't init sdl audio");
     let game_controller_subsystem = sdl_context.game_controller().expect("Couldn't init sdl game_controller");
     let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).expect("Couldn't init ttf");
 
@@ -489,14 +503,11 @@ fn main() {
 
     let textures = vec![debug_mine_texture, flagged_mine_texture, unflagged_mine_texture, revealed_mine_texture, cursor_texture, revealed_mine_1_texture, revealed_mine_2_texture, revealed_mine_3_texture, revealed_mine_4_texture, revealed_mine_5_texture, revealed_mine_6_texture, revealed_mine_7_texture, revealed_mine_8_texture];
 
-    let desired_spec = AudioSpecDesired {
-        freq: Some(SAMPLE_RATE as i32),
-        channels: Some(2),
-        samples: None,
-    };
+    let _mixer_context = sdl2::mixer::init(InitFlag::MP3);
+    let _ = sdl2::mixer::open_audio(DEFAULT_FREQUENCY, DEFAULT_FORMAT, DEFAULT_CHANNELS, 1_024);
 
-    let device: AudioQueue<f32> = audio_subsystem.open_queue(None, &desired_spec).expect("Couldn't get a desired audio device");
-    device.resume();
+    let music = sdl2::mixer::Music::from_static_bytes(AWAKE10_MEGA_WALL).expect("Couldn't create music from static bytes");
+    let _ = music.play(-1);
 
     let number_of_joystics = game_controller_subsystem.num_joysticks().expect("Couldn't find any joysticks");
     let _controller = (0..number_of_joystics)
