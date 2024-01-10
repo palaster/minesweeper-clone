@@ -12,6 +12,7 @@ use sdl2::rwops::RWops;
 use sdl2::ttf::Font;
 use sdl2::video::Window;
 
+#[link(name = "stdc++", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "vorbis", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "vorbisfile", kind = "static", modifiers = "+whole-archive")]
 #[link(name = "mikmod", kind = "static", modifiers = "+whole-archive")]
