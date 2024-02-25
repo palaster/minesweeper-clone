@@ -6,6 +6,7 @@ use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
+use sdl2::mixer::{InitFlag, DEFAULT_CHANNELS, DEFAULT_FORMAT, DEFAULT_FREQUENCY};
 use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -57,6 +58,8 @@ const REVEALED_MINE_7: &[u8; 427] = include_bytes!("../assets/revealed_mine_7.pn
 const REVEALED_MINE_8: &[u8; 792] = include_bytes!("../assets/revealed_mine_8.png");
 
 const MOULDY_CHEESE_REGULAR: &[u8; 112116] = include_bytes!("../assets/MouldyCheeseRegular-WyMWG.ttf");
+
+const AWAKE10_MEGA_WALL: &[u8; 2026231] = include_bytes!("../assets/awake10_megaWall.mp3");
 
 #[derive(Clone, Copy)]
 struct Cell {
@@ -437,7 +440,7 @@ impl Game {
 fn main() {
     let sdl_context = sdl2::init().expect("Couldn't init sdl");
     let video_subsystem = sdl_context.video().expect("Couldn't init sdl video");
-    let audio_subsystem = sdl_context.audio().expect("Couldn't init sdl audio");
+    let _audio_subsystem = sdl_context.audio().expect("Couldn't init sdl audio");
     let game_controller_subsystem = sdl_context.game_controller().expect("Couldn't init sdl game_controller");
     let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).expect("Couldn't init ttf");
 
@@ -473,14 +476,11 @@ fn main() {
 
     let textures = vec![debug_mine_texture, flagged_mine_texture, unflagged_mine_texture, revealed_mine_texture, cursor_texture, revealed_mine_1_texture, revealed_mine_2_texture, revealed_mine_3_texture, revealed_mine_4_texture, revealed_mine_5_texture, revealed_mine_6_texture, revealed_mine_7_texture, revealed_mine_8_texture];
 
-    let desired_spec = AudioSpecDesired {
-        freq: Some(SAMPLE_RATE as i32),
-        channels: Some(2),
-        samples: None,
-    };
+    let _mixer_content = sdl2::mixer::init(InitFlag::MP3);
+    let _ = sdl2::mixer::open_audio(DEFAULT_FREQUENCY, DEFAULT_FORMAT, DEFAULT_CHANNELS, 1_024);
 
-    let device: AudioQueue<f32> = audio_subsystem.open_queue(None, &desired_spec).expect("Couldn't get a desired audio device");
-    device.resume();
+    let music = sdl2::mixer::Music::from_static_bytes(AWAKE10_MEGA_WALL).expect("Couldn't create music from static bytes");
+    let _ = music.play(-1);
 
     let number_of_joystics = game_controller_subsystem.num_joysticks().expect("Couldn't find any joysticks");
     let _controller = (0..number_of_joystics)
@@ -773,3 +773,4 @@ fn render_end(game: &Game, canvas: &mut Canvas<Window>, font: &Font) {
         canvas.copy(&correct_texture, None, Some(Rect::new(((WIDTH / 2) - (CORRECT_WIDTH / 2)).into(), (HEIGHT / 4) as i32 + DURATION_HEIGHT as i32, CORRECT_WIDTH.into(), CORRECT_HEIGHT))).expect("Couldn't copy canvas");
     }
 }
+
