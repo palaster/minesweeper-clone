@@ -1,6 +1,6 @@
 use std::time::{Instant, Duration};
 
-use eframe::egui::{ImageSource, Vec2};
+use eframe::egui::{Color32, ImageSource, RichText, Vec2};
 use eframe::{egui, egui::CentralPanel};
 use eframe::{run_native, App, NativeOptions};
 
@@ -248,7 +248,6 @@ impl Field {
 
 #[derive(Clone, Copy)]
 struct Game {
-    scene: usize,
     was_winner: bool,
     should_die: bool,
     game_instant: Option<Instant>,
@@ -279,7 +278,6 @@ impl Game {
 
     fn new() -> Game {
         Game {
-            scene: 0,
             was_winner: false,
             should_die: false,
             game_instant: None,
@@ -450,7 +448,9 @@ impl App for Game {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         if !self.should_die {
             CentralPanel::default().show(ctx, |ui| {
-                ui.label("");
+                ui.label(format!("Time: {}", if let Some(game_instant) = self.game_instant { game_instant.elapsed().as_secs() } else { 0 }));
+                ui.label(format!("Flags: {}", self.field.flags_left));
+                ui.label(RichText::new("Palaster").color(Color32::RED));
                 ui.style_mut().spacing.item_spacing = Vec2::ZERO;
                 for i in 0..NUMBER_OF_ROWS_AND_COLUMNS {
                     ui.horizontal(|ui| {
@@ -485,7 +485,7 @@ impl App for Game {
             });
         } else {
             CentralPanel::default().show(ctx, |ui| {
-
+                
             });
         }
     }
