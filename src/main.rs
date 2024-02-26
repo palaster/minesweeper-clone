@@ -1,19 +1,8 @@
-use std::thread;
 use std::time::{Instant, Duration};
 
-use sdl2::audio::{AudioSpecDesired, AudioQueue};
-use sdl2::controller::Button;
-use sdl2::event::Event;
-use sdl2::image::LoadTexture;
-use sdl2::keyboard::Keycode;
-use sdl2::mixer::{InitFlag, DEFAULT_CHANNELS, DEFAULT_FORMAT, DEFAULT_FREQUENCY};
-use sdl2::mouse::MouseButton;
-use sdl2::pixels::Color;
-use sdl2::rect::Rect;
-use sdl2::render::{BlendMode, Canvas, Texture};
-use sdl2::rwops::RWops;
-use sdl2::ttf::Font;
-use sdl2::video::Window;
+use eframe::egui::{ImageSource, Vec2};
+use eframe::{egui, egui::CentralPanel};
+use eframe::{run_native, App, NativeOptions};
 
 const NUMBER_OF_ROWS_AND_COLUMNS: usize = 24;
 const NUMBER_OF_CELLS: usize = NUMBER_OF_ROWS_AND_COLUMNS * NUMBER_OF_ROWS_AND_COLUMNS;
@@ -42,20 +31,22 @@ const fn two_d_to_one_d(x: usize, y: usize) -> usize {
 
 const SAMPLE_RATE: u16 = 44_100;
 
-const DEBUG_MINE: &[u8; 210] = include_bytes!("../assets/debug_mine.png");
-const FLAGGED_MINE: &[u8; 211] = include_bytes!("../assets/flagged_mine.png");
-const UNFLAGGED_MINE: &[u8; 128] = include_bytes!("../assets/unflagged_mine.png");
-const REVEALED_MINE: &[u8; 128] = include_bytes!("../assets/revealed_mine.png");
-const CURSOR: &[u8; 129] = include_bytes!("../assets/cursor.png");
+const DEBUG_MINE: ImageSource<'_> = egui::include_image!("../assets/debug_mine.png");
+const FLAGGED_MINE: ImageSource<'_> = egui::include_image!("../assets/flagged_mine.png");
+const UNFLAGGED_MINE: ImageSource<'_> = egui::include_image!("../assets/unflagged_mine.png");
+const REVEALED_MINE: ImageSource<'_> = egui::include_image!("../assets/revealed_mine.png");
+const CURSOR: ImageSource<'_> = egui::include_image!("../assets/cursor.png");
 
-const REVEALED_MINE_1: &[u8; 253] = include_bytes!("../assets/revealed_mine_1.png");
-const REVEALED_MINE_2: &[u8; 583] = include_bytes!("../assets/revealed_mine_2.png");
-const REVEALED_MINE_3: &[u8; 639] = include_bytes!("../assets/revealed_mine_3.png");
-const REVEALED_MINE_4: &[u8; 410] = include_bytes!("../assets/revealed_mine_4.png");
-const REVEALED_MINE_5: &[u8; 509] = include_bytes!("../assets/revealed_mine_5.png");
-const REVEALED_MINE_6: &[u8; 736] = include_bytes!("../assets/revealed_mine_6.png");
-const REVEALED_MINE_7: &[u8; 427] = include_bytes!("../assets/revealed_mine_7.png");
-const REVEALED_MINE_8: &[u8; 792] = include_bytes!("../assets/revealed_mine_8.png");
+const REVEALED_MINE_1: ImageSource<'_> = egui::include_image!("../assets/revealed_mine_1.png");
+const REVEALED_MINE_2: ImageSource<'_> = egui::include_image!("../assets/revealed_mine_2.png");
+const REVEALED_MINE_3: ImageSource<'_> = egui::include_image!("../assets/revealed_mine_3.png");
+const REVEALED_MINE_4: ImageSource<'_> = egui::include_image!("../assets/revealed_mine_4.png");
+const REVEALED_MINE_5: ImageSource<'_> = egui::include_image!("../assets/revealed_mine_5.png");
+const REVEALED_MINE_6: ImageSource<'_> = egui::include_image!("../assets/revealed_mine_6.png");
+const REVEALED_MINE_7: ImageSource<'_> = egui::include_image!("../assets/revealed_mine_7.png");
+const REVEALED_MINE_8: ImageSource<'_> = egui::include_image!("../assets/revealed_mine_8.png");
+
+const CELL_IMAGES: [ImageSource<'_>; 13] = [DEBUG_MINE, FLAGGED_MINE, UNFLAGGED_MINE, REVEALED_MINE, CURSOR, REVEALED_MINE_1, REVEALED_MINE_2, REVEALED_MINE_3, REVEALED_MINE_4, REVEALED_MINE_5, REVEALED_MINE_6, REVEALED_MINE_7, REVEALED_MINE_8];
 
 const MOULDY_CHEESE_REGULAR: &[u8; 112116] = include_bytes!("../assets/MouldyCheeseRegular-WyMWG.ttf");
 
@@ -268,6 +259,24 @@ struct Game {
 }
 
 impl Game {
+    fn new_with_context(cc: &eframe::CreationContext<'_>) -> Game {
+        let mut fonts = egui::FontDefinitions::default();
+
+        let font_key = String::from("mouldy_cheese_regular");
+
+        fonts.font_data.insert(font_key.clone(), egui::FontData::from_static(MOULDY_CHEESE_REGULAR));
+
+        fonts.families.entry(egui::FontFamily::Proportional).or_default().insert(0, font_key.clone());
+
+        fonts.families.entry(egui::FontFamily::Monospace).or_default().push(font_key);
+
+        cc.egui_ctx.set_fonts(fonts);
+
+        egui_extras::install_image_loaders(&cc.egui_ctx);
+
+        Game::new()
+    }
+
     fn new() -> Game {
         Game {
             scene: 0,
@@ -437,69 +446,55 @@ impl Game {
         }
 }
 
+impl App for Game {
+    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
+        if !self.should_die {
+            CentralPanel::default().show(ctx, |ui| {
+                ui.label("");
+                ui.style_mut().spacing.item_spacing = Vec2::ZERO;
+                for i in 0..NUMBER_OF_ROWS_AND_COLUMNS {
+                    ui.horizontal(|ui| {
+                        for j in 0..NUMBER_OF_ROWS_AND_COLUMNS {
+                            let cell_index = two_d_to_one_d(j, i);
+                            let cell = self.field.cells[cell_index];
+                            let image = if cell.revealed {
+                                match cell.mines_around {
+                                    1..=8 => {
+                                        CELL_IMAGES[4 + (cell.mines_around as usize)].clone()
+                                    },
+                                    _ => {
+                                        CELL_IMAGES[3].clone()
+                                    },
+                                }
+                            } else if cell.flagged {
+                                CELL_IMAGES[1].clone()
+                            } else {
+                                CELL_IMAGES[2].clone()
+                            };
+                            let response = ui.add(egui::widgets::ImageButton::new(image).frame(false));
+                            if response.clicked() {
+                                self.reveal_from_index(cell_index);
+                            }
+                            if response.secondary_clicked() {
+                                self.flag_from_index(cell_index);
+                            }
+                        }
+                    });
+                }
+                ui.reset_style();
+            });
+        } else {
+            CentralPanel::default().show(ctx, |ui| {
+
+            });
+        }
+    }
+}
+
 fn main() {
-    let sdl_context = sdl2::init().expect("Couldn't init sdl");
-    let video_subsystem = sdl_context.video().expect("Couldn't init sdl video");
-    let _audio_subsystem = sdl_context.audio().expect("Couldn't init sdl audio");
-    let game_controller_subsystem = sdl_context.game_controller().expect("Couldn't init sdl game_controller");
-    let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).expect("Couldn't init ttf");
+    if run_native("Minesweeper", NativeOptions::default(), Box::new(|cc| Box::new(Game::new_with_context(cc)))).is_err() {}
 
-    let window = video_subsystem.window("Minesweeper", WIDTH.into(), HEIGHT.into())
-        .position_centered()
-        .build()
-        .expect("Couldn't create window from video");
-
-    let mut canvas = window.into_canvas()
-        .accelerated()
-        .build()
-        .expect("Couldn't create canvas from window");
-
-    let font_rwops = RWops::from_bytes(MOULDY_CHEESE_REGULAR).expect("Couldn't create rwops from MOULDY_CHEESE_REGUAL");
-    let font = ttf_context.load_font_from_rwops(font_rwops, 128).expect("Couldn't load font");
-
-    let texture_creator = canvas.texture_creator();
-
-    let debug_mine_texture = texture_creator.load_texture_bytes(DEBUG_MINE).expect("Couldn't create texture from DEBUG_MINE");
-    let flagged_mine_texture = texture_creator.load_texture_bytes(FLAGGED_MINE).expect("Couldn't create texture from FLAGGED_MINE");
-    let unflagged_mine_texture = texture_creator.load_texture_bytes(UNFLAGGED_MINE).expect("Couldn't create texture from UNFLAGGED_MINE");
-    let revealed_mine_texture = texture_creator.load_texture_bytes(REVEALED_MINE).expect("Couldn't create texture from REVEALED_MINE");
-    let cursor_texture = texture_creator.load_texture_bytes(CURSOR).expect("Couldn't create texture from CURSOR");
-
-    let revealed_mine_1_texture = texture_creator.load_texture_bytes(REVEALED_MINE_1).expect("Couldn't create texture from REVEALED_MINE_1");
-    let revealed_mine_2_texture = texture_creator.load_texture_bytes(REVEALED_MINE_2).expect("Couldn't create texture from REVEALED_MINE_2");
-    let revealed_mine_3_texture = texture_creator.load_texture_bytes(REVEALED_MINE_3).expect("Couldn't create texture from REVEALED_MINE_3");
-    let revealed_mine_4_texture = texture_creator.load_texture_bytes(REVEALED_MINE_4).expect("Couldn't create texture from REVEALED_MINE_4");
-    let revealed_mine_5_texture = texture_creator.load_texture_bytes(REVEALED_MINE_5).expect("Couldn't create texture from REVEALED_MINE_5");
-    let revealed_mine_6_texture = texture_creator.load_texture_bytes(REVEALED_MINE_6).expect("Couldn't create texture from REVEALED_MINE_6");
-    let revealed_mine_7_texture = texture_creator.load_texture_bytes(REVEALED_MINE_7).expect("Couldn't create texture from REVEALED_MINE_7");
-    let revealed_mine_8_texture = texture_creator.load_texture_bytes(REVEALED_MINE_8).expect("Couldn't create texture from REVEALED_MINE_8");
-
-    let textures = vec![debug_mine_texture, flagged_mine_texture, unflagged_mine_texture, revealed_mine_texture, cursor_texture, revealed_mine_1_texture, revealed_mine_2_texture, revealed_mine_3_texture, revealed_mine_4_texture, revealed_mine_5_texture, revealed_mine_6_texture, revealed_mine_7_texture, revealed_mine_8_texture];
-
-    let _mixer_content = sdl2::mixer::init(InitFlag::MP3);
-    let _ = sdl2::mixer::open_audio(DEFAULT_FREQUENCY, DEFAULT_FORMAT, DEFAULT_CHANNELS, 1_024);
-
-    let music = sdl2::mixer::Music::from_static_bytes(AWAKE10_MEGA_WALL).expect("Couldn't create music from static bytes");
-    let _ = music.play(-1);
-
-    let number_of_joystics = game_controller_subsystem.num_joysticks().expect("Couldn't find any joysticks");
-    let _controller = (0..number_of_joystics)
-        .find_map(|id| {
-            if !game_controller_subsystem.is_game_controller(id) {
-                return None;
-            }
-            game_controller_subsystem.open(id).ok()
-        });
-
-    let mut event_pump = sdl_context.event_pump().expect("Couldn't get event_pump from sdl_context");
-
-    let mut game = Game::new();
-
-    let mut previous_instant: Instant = Instant::now();
-    let mut current_instant: Instant;
-    
-    let frame_per_second: Duration = Duration::from_secs_f64(1.0/60.0);
-
+    /*
     'running: loop {
         game.update();
 
@@ -654,8 +649,10 @@ fn main() {
             thread::sleep(frame_per_second - elapsed);
         }
     }
+     */
 }
 
+/*
 fn render_game(game: &Game, canvas: &mut Canvas<Window>, textures: &[Texture], font: &Font) {
     canvas.set_blend_mode(BlendMode::Blend);
     canvas.set_draw_color(Color::RGB(128, 128, 128));
@@ -773,4 +770,4 @@ fn render_end(game: &Game, canvas: &mut Canvas<Window>, font: &Font) {
         canvas.copy(&correct_texture, None, Some(Rect::new(((WIDTH / 2) - (CORRECT_WIDTH / 2)).into(), (HEIGHT / 4) as i32 + DURATION_HEIGHT as i32, CORRECT_WIDTH.into(), CORRECT_HEIGHT))).expect("Couldn't copy canvas");
     }
 }
-
+*/
